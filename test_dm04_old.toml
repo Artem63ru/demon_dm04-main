@@ -1,0 +1,150 @@
+#[tomlConfig]
+version = "0.0.3"   # версия конфигурационного файла
+# 0.0.1 - начальная версия
+# 0.0.2 - несколько портов, насколько устройств (нод) на порту
+# 0.0.3 - добавлены порты по TCP на порту
+upport_tcp = 45502  # порт для системы верхего уровня
+local_port = 17000
+count_tty_serial = 1        # должно быть реальное значение каналов
+count_tcp_serial = 1
+[[tty_serial]]
+# с версии 0.17 указыавем полный путь к устройству
+#port_tty = "/dev/ttyUSB0"   # CH341 на USB
+port_tty = "COM3"   # виртуальный COM порт в Wimsows
+#port_tty = "/dev/tnt1"   # tty0tty эмулятор serial port tnt0<->tnt1
+baud = 115200       # 9600,19200,38400, 57600, 115200, 230400, 460800
+stop = 1            #   1 or 2
+bits = 8            #   7 or 8
+parity = "N"        # N,E,O
+slave  = false      # канал slave
+time_loop = 200     # cicle for master ms ( min 100 )
+count_node = 6      # количество устройств на порту
+# input registers
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 1      # адрес устройства на шине
+    command = 4         # команда запроса
+    address_data = 0    # адрес данных в устройстве
+    data_length = 10    # длинна запрашиваемых данных
+    index_up = 0        # индекс на общей карте параметров
+    
+# input registers
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 1
+    command = 4
+    address_data = 0
+    data_length = 10
+    index_up = 10
+
+# input registers
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 1
+    command = 4
+    address_data = 0
+    data_length = 10
+    index_up = 20
+
+# discrete inputs
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 1
+    command = 2
+    address_data = 8
+    data_length = 16
+    index_up = 0
+# holding registers
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 1
+    command = 3
+    address_data = 0
+    data_length = 10
+    index_up = 0
+# Coils discrete
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 2
+    command = 1
+    address_data = 0
+    data_length = 10
+    index_up = 0
+
+    [[tty_serial.set_node]]
+
+[[tty_serial]]
+# с версии 0.17 указыавем полный путь к устройству
+#port_tty = "/dev/ttyS2"   # CH341 на USB0
+port_tty = "/dev/tnt1"   # tty0tty эмулятор serial port tnt0<->tnt1
+baud = 115200       # 9600,19200,38400, 57600, 115200, 230400, 460800
+stop = 1            #   1 or 2
+bits = 8            #   7 or 8
+parity = "N"        # N,E,O
+slave  = false      # канал slave
+time_loop = 200     # cicle for master ms ( min 100 )
+count_node = 2      # количество устройств на порту
+    [[tty_serial.set_node]]
+    address_id = 1
+    enable = true
+    command = 4
+    address_data = 0
+    data_length = 10
+    index_up = 30
+    
+    [[tty_serial.set_node]]
+    address_id = 1
+    enable = false
+    command = 4
+    address_data = 0
+    data_length = 10
+    index_up = 40
+
+ #holding registers
+    [[tty_serial.set_node]]
+    enable = true
+    address_id = 1
+    command = 3
+    address_data = 0
+    data_length = 10
+    index_up = 20
+    
+    [[tty_serial.set_node]]
+
+#[[tty_serial]]
+
+[[tcp_serial]]
+# с версии 0.17 указыавем полный путь к устройству
+    mode = "TCP"        # or UDP - пока UDP не рассматриваем
+#    ip = "192.168.0.37"
+    ip = "127.0.0.1"     # при отладке на симуляторе - localhost
+#    ip = "192.168.0.4"    # при отладке на симуляторе Modbus Slave через внешний IP
+    port = 11502          # port used
+    time_loop = 200
+    count_node = 3        # количество устройств на порту
+# описание nede? как и в tty_serial
+    [[tcp_serial.set_node]]
+    enable = true
+    address_id = 1      # адрес устройства на шине
+    command = 1         # команда запроса 1 - Read Coils
+    address_data = 0    # адрес данных в устройстве
+    data_length = 10    # длинна запрашиваемых данных
+    index_up = 10       # индекс на общей карте параметров
+    [[tcp_serial.set_node]]
+    enable = true
+    address_id = 1      # адрес устройства на шине - пока один- отлаживаемся на эмуляторе
+    command = 4         # команда запроса
+    address_data = 0    # адрес данных в устройстве
+    data_length = 10    # длинна запрашиваемых данных
+    index_up = 60       # индекс на общей карте параметров
+    [[tcp_serial.set_node]]
+    enable = true
+    address_id = 1      # адрес устройства на шине - пока один- отлаживаемся на эмуляторе
+    command = 4         # команда запроса
+    address_data = 0    # адрес данных в устройстве
+    data_length = 10    # длинна запрашиваемых данных
+    index_up = 70       # индекс на общей карте параметров
+
+[[tcp_serial]]
+
+
