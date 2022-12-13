@@ -1,0 +1,42 @@
+####Просмотр занятых портов в Linux
+netstat -tulnap
+#### Kill занятых портов DM04 в Linux
+sudo fuser -k 17000/tcp
+
+#### path DM04 в Linux
+/root/projects/test_dm04_v2/
+
+#### сервис DM04 в Linux
+nano /etc/systemd/system/dm04.service  -  редактирование
+
+[Unit]
+Description=DM04 service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=root
+Group=root
+Type=simple
+Restart=no
+ExecStart=/home/user/dm04.sh
+
+[Install]
+WantedBy=multi-user.target
+
+
+sudo systemctl daemon-reload - рестарт всех демонов
+
+sudo systemctl enable dm04.service
+
+sudo systemctl status dm04.service
+
+sudo systemctl start dm04.service
+
+sudo systemctl stop dm04.service
+#### сервис DM04 в Linux
+
+
+ln -s /root/projects/test_dm04_v2/test_dm04 /usr/local/bin
+ cd /root/projects/test_dm04_v2/ && ./test_dm04
+ cd /home/user/dm04.sh
