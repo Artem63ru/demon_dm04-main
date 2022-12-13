@@ -11,12 +11,12 @@ count_tcp_serial = 1
 [[tcp_serial]]
 # с версии 0.17 указыавем полный путь к устройству
     mode = "TCP"        # or UDP - пока UDP не рассматриваем
-    ip = "192.168.1.128"
-#    ip = "127.0.0.1"     # при отладке на симуляторе - localhost
+#    ip = "192.168.1.128"
+    ip = "127.0.0.1"     # при отладке на симуляторе - localhost
 #    ip = "192.168.0.4"    # при отладке на симуляторе Modbus Slave через внешний IP
     port = 502          # port used
-    time_loop = 3000
-    count_node = 5       # количество устройств на порту
+    time_loop = 1000
+    count_node = 1       # количество устройств на порту
 # описание nede? как и в tty_serial
 # input registers – ИЭ05-1
     [[tcp_serial.set_node]]

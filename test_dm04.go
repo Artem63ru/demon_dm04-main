@@ -672,12 +672,15 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 					for ii := 0; ii < int(chanel.Set_node[count].Data_length); ii++ {
 						if chanel.Set_node[count].Type_par == 1 { // Пишем регистр в область InputRegisters
 							//server.HoldingRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
+							// Пересчет милиамперов из Такт-У в кода АЦП Зонда 0-4096
+							s := int16(new_data[ii])
+							new_data[ii] = uint16(float32(s) * 0.2048)
 							server.InputRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
 						}
 						if chanel.Set_node[count].Type_par == 2 { // Разбираем Слово на биты если нам надо прочитать дискретный вход
 							buf := new_data[ii]
-							server.DiscreteInputs[int(chanel.Set_node[count].Index_up)-1] = 1     //СВЯЗЬ С 2ДЭ07Е 0 - нет связи
-							server.DiscreteInputs[int(chanel.Set_node[count].Index_up)-1+168] = 1 // Достоверность
+							server.DiscreteInputs[int(chanel.Set_node[count].Index_up)-1] = 1     //СВЯЗЬ С устройством 0 - нет связи
+							server.DiscreteInputs[int(chanel.Set_node[count].Index_up)-1+168] = 1 // Достоверность сдвигаем на область дискретов тут 168
 							for j := 0; j < 16; j++ {
 								if (buf>>j)&1 == 1 {
 									server.DiscreteInputs[j+int(chanel.Set_node[count].Index_up)] = 1

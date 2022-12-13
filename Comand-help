@@ -40,3 +40,8 @@ sudo systemctl stop dm04.service
 ln -s /root/projects/test_dm04_v2/test_dm04 /usr/local/bin
  cd /root/projects/test_dm04_v2/ && ./test_dm04
  cd /home/user/dm04.sh
+
+ root@orangepizero:~# sudo systemctl stop dm04.service
+ root@orangepizero:~# cd /root/projects/test_dm04_v2/
+ root@orangepizero:~/projects/test_dm04_v2# go build
+ root@orangepizero:~/projects/test_dm04_v2#
