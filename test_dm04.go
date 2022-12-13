@@ -112,6 +112,7 @@ type node struct {
 	Address_data uint16 // адрес начала данных с ноде
 	Data_length  uint16 // длинна данных
 	Index_up     uint   // позиция данных с ноды в на глобальной карте параметров
+	Type_par     uint   // Тип параметра получаемого от такт-у 1-AI, 2-DI
 	// изменяется во время опроса по ответу-неответу от устройства - делать не здесь, а в статусе
 	//	Time   time.Time // время последнего опроса
 	//	Status uint8     // статус опроса устройства
@@ -636,11 +637,6 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 					// можно сохранить в памяти сервера
 					//	_, err := client_local.WriteMultipleCoils(uint16(chanel.Set_node[count].Index_up), uint16(chanel.Set_node[count].Data_length), result2)
 					new_data := result2
-					/*	for ii := 0; ii < int(chanel.Set_node[count].Data_length); ii++ {
-						//	server.DiscreteInputs[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
-							server.DiscreteInputs[ii+int(chanel.Set_node[count].Index_up)] = result2[ii]
-						}
-					*/
 					for i := 0; i < len(new_data); i++ {
 						for b := 0; b < 8; b++ {
 							if (b + i*8) < int(chanel.Set_node[count].Data_length) {
@@ -674,12 +670,26 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 					//	_, err := client_local.WriteMultipleRegisters(uint16(chanel.Set_node[count].Index_up), uint16(chanel.Set_node[count].Data_length), result3)
 					new_data := mbserver.BytesToUint16(result3)
 					for ii := 0; ii < int(chanel.Set_node[count].Data_length); ii++ {
-						//server.HoldingRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
-						server.InputRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
+						if chanel.Set_node[count].Type_par == 1 { // Пишем регистр в область InputRegisters
+							//server.HoldingRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
+							server.InputRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
+						}
+						if chanel.Set_node[count].Type_par == 2 { // Разбираем Слово на биты если нам надо прочитать дискретный вход
+							buf := new_data[ii]
+							server.DiscreteInputs[int(chanel.Set_node[count].Index_up)-1] = 1     //СВЯЗЬ С 2ДЭ07Е 0 - нет связи
+							server.DiscreteInputs[int(chanel.Set_node[count].Index_up)-1+168] = 1 // Достоверность
+							for j := 0; j < 16; j++ {
+								if (buf>>j)&1 == 1 {
+									server.DiscreteInputs[j+int(chanel.Set_node[count].Index_up)] = 1
+									server.DiscreteInputs[j+int(chanel.Set_node[count].Index_up)+168] = 1 // Достоверность
+								} else {
+									server.DiscreteInputs[j+int(chanel.Set_node[count].Index_up)] = 0
+									server.DiscreteInputs[j+int(chanel.Set_node[count].Index_up)+168] = 1 // Достоверность
+								}
+
+							}
+						}
 					}
-					// if err != nil {
-					//	fmt.Printf(err.Error())
-					//	}
 				}
 			default:
 				// пока ошибки toml на уровне описания ноды не обрабатываю

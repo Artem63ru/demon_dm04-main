@@ -16,7 +16,7 @@ count_tcp_serial = 1
 #    ip = "192.168.0.4"    # при отладке на симуляторе Modbus Slave через внешний IP
     port = 502          # port used
     time_loop = 3000
-    count_node = 3       # количество устройств на порту
+    count_node = 5       # количество устройств на порту
 # описание nede? как и в tty_serial
 # input registers – ИЭ05-1
     [[tcp_serial.set_node]]
@@ -26,6 +26,7 @@ count_tcp_serial = 1
         address_data = 3       # адрес данных в устройстве
         data_length = 4        # длинна запрашиваемых данных только 30004-7
         index_up = 6          # индекс на общей карте параметров
+        type_par = 1          # Тип параметра получаемого от такт-у 1-AI, 2-DI
 # input registers – ИЭ05-2
     [[tcp_serial.set_node]]
         enable = true           # работает или нет
@@ -34,15 +35,37 @@ count_tcp_serial = 1
         address_data = 7        # адрес данных в устройстве
         data_length = 4         # длинна запрашиваемых данных только
         index_up = 10          # индекс на общей карте параметров
+        type_par = 1          # Тип параметра получаемого от такт-у 1-AI, 2-DI
+
 # input registers – ИЭ05-3
     [[tcp_serial.set_node]]
         enable = true           # работает или нет
         address_id = 1          # адрес устройства на шине (1..247)
         command = 3             # команда запроса – запрос INPUT регитстров из устройства
-        address_data = 13        # адрес данных в устройстве
+        address_data = 13       # адрес данных в устройстве
         data_length = 1         # длинна запрашиваемых данных только
         index_up = 14           # индекс на общей карте параметров
+        type_par = 1            # Тип параметра получаемого от такт-у 1-AI, 2-DI
 
+# input registers – ДЭ07-1
+    [[tcp_serial.set_node]]
+        enable = true           # работает или нет
+        address_id = 1          # адрес устройства на шине (1..247)
+        command = 3             # команда запроса – запрос INPUT регитстров из устройства
+        address_data = 101      # адрес данных в устройстве
+        data_length = 1         # длинна запрашиваемых данных для дискрета 16 бит
+        index_up = 35           # индекс на общей карте параметров
+        type_par = 2            # Тип параметра получаемого от такт-у 1-AI, 2-DI
+
+# input registers – ДЭ07-2
+    [[tcp_serial.set_node]]
+        enable = true           # работает или нет
+        address_id = 1          # адрес устройства на шине (1..247)
+        command = 3             # команда запроса – запрос INPUT регитстров из устройства
+        address_data = 103      # адрес данных в устройстве
+        data_length = 1         # длинна запрашиваемых данных для дискрета 16 бит
+        index_up = 64            # индекс на общей карте параметров
+        type_par = 2            # Тип параметра получаемого от такт-у 1-AI, 2-DI
 
 [[tcp_serial]]
 
