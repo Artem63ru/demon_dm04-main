@@ -59,6 +59,18 @@ type CoilsRedirect struct {
 	Time         time.Time      // время последней записи в Coils
 	Status       uint8          // статус записи еденичного Ciolsa устройства
 }
+type KR_registrs_cils struct {
+	KR_num       int            // номер крана/канала для управления
+	ChanelTCP    int            // канал для задписи Coils с работой по TCP или UDP
+	Address_id   uint8          // адрес устройства на шине
+	sesion       int            // Открытие ссесии 0-нет 1-открыта
+	pred         int            // предварительная команда 0-нет 1-открыть 2-закрыть
+	TU           int            // команда 0-нет 1-открыть 2-закрыть
+	Address_data uint16         // адрес Coils В устройстве начальный
+	icc          chan<- inc_req // канал для передачи данных записи в гороутину
+	Time         time.Time      // время последней записи в Coils
+	Status       uint8          // статус записи еденичного Ciolsa устройства
+}
 
 type HoldingRegisterRedirect struct {
 	ChanelSerial int            // канал для записи Coils с работой по Serial, 0-если не используется
@@ -146,6 +158,15 @@ func config_control() bool {
 	return true
 }
 
+// ***************************************************************************************
+// Проверка на ошибку для уменьшения писанины
+func err_log(err3 error, result []byte) {
+	if err3 != nil {
+		Log.Printf("**ERROR** Chanel: %s", result)
+		os.Exit(-1)
+	}
+}
+
 // структура для передачи запроса на исполнение команды с данными в канал с необходимым нам устройством Modbus RTU
 type inc_req struct {
 	Address_id   uint8       // адрес устройства на Modbus RTU
@@ -155,6 +176,10 @@ type inc_req struct {
 	Data         [125]uint16 // данные для операции (максимальня длинна)
 	Pos          uint16      // позиция первого параметра в карте памяти Coils или HildingRegisters для записи Time и Status последней операции
 }
+
+// ***************************************************************************************
+// запрос необходимых данных от устройства
+var kr KR_registrs_cils
 
 // ***************************************************************************************
 // запрос необходимых данных от устройства
@@ -388,38 +413,45 @@ func req_serial(server *mbserver.Server, chanel *set_serial, cc <-chan struct{},
 // ***************************************************************************************
 // функция обработки записи еденичного Coil (5)
 func WrSingleCoilsOverr(server *mbserver.Server) {
-	var xx inc_req
+	var xx KR_registrs_cils
 	server.RegisterFunctionHandler(5,
 		func(s *mbserver.Server, frame mbserver.Framer) ([]byte, *mbserver.Exception) {
 			data1 := frame.GetData()
 			register := int(binary.BigEndian.Uint16(data1[0:2])) // адрес регистра
 			numRegs := int(binary.BigEndian.Uint16(data1[2:4]))  // это как раз данные для записи 0xFF00 - on, 0x0000 - off
-			//			endRegister := register + numRegs
-			//		register, numRegs, endRegister := frame.registerAddressAndNumber()
-			//			data := make([]byte, 4)
-			xx.Address_id = CoilsRed[register].Address_id     // адрес устройства на щине modbus
-			xx.Command = 5                                    // запись еденичного Coils
-			xx.Address_data = CoilsRed[register].Address_data // адрес данных в устройстве
-			xx.Pos = uint16(register)                         // позиция в табюлице реверса для записи статусов
-			xx.Data[0] = uint16(numRegs)                      // данные по записи
-			xx.Data_length = 1                                // у нас один регистр
-			CoilsRed[register].icc <- xx                      // перезадим данные в нужную нам горутину
-			if Debug {
-				fmt.Printf("\t>>>>> Write Sigle Coils: %v\r\n", data1)
-				//				fmt.Printf("register: %d, numRegs: 0x%2F, endRegister %d\r\n", register, numRegs, endRegister)
-				h := fmt.Sprintf("%04x", numRegs)
-				fmt.Printf("\t>>>>> register: %d, data: 0x%s\r\n", register, h)
-			}
-			//			нeужен свой расклад, что, куда писать из массива CoilsRed и данные
+			xx.Address_id = CoilsRed[register].Address_id        // адрес устройства на шине modbus
+			xx.Address_data = CoilsRed[register].Address_data    // адрес данных в устройстве
+			xx.Time = time.Now()
+			if numRegs > 0 {
+				s.Coils[register] = 1
+				switch register {
+				// *************************************
+				case int(config.Tcp_serial[0].Set_node[5].Index_up):
+					fmt.Printf("\t>>>>> Сеанс управление закрыт: %v\r\n", uint8(register))
+					kr.sesion = 1
+				case int(config.Tcp_serial[0].Set_node[5].Index_up - 6):
+					fmt.Printf("\t>>>>> Предварительная закрыть: %v\r\n", uint8(register))
+					kr.pred = 2
+				case int(config.Tcp_serial[0].Set_node[5].Index_up - 5):
+					fmt.Printf("\t>>>>> Управление краном закрыть: %v\r\n", uint8(register))
+					kr.TU = 2
+				}
 
-			//			dataSize := numRegs / 8
-			//			data := make([]byte, 1+dataSize)
-			//			data[0] = byte(dataSize)
-			//			for i := range s.DiscreteInputs[register:endRegister] {
-			//				// Return all 1s, regardless of the value in the DiscreteInputs array.
-			//				shift := uint(i) % 8
-			//				data[1+i/8] |= byte(1 << shift)
-			//			}
+			} else {
+				s.Coils[register] = 0
+				switch register {
+				// *************************************
+				case int(config.Tcp_serial[0].Set_node[5].Index_up):
+					fmt.Printf("\t>>>>> Сеанс управление открыт: %v\r\n", uint8(register))
+					kr.sesion = 0
+				case int(config.Tcp_serial[0].Set_node[5].Index_up - 6):
+					fmt.Printf("\t>>>>> Предварительная открыть: %v\r\n", uint8(register))
+					kr.pred = 1
+				case int(config.Tcp_serial[0].Set_node[5].Index_up - 5):
+					fmt.Printf("\t>>>>> Управление краном открыть: %v\r\n", uint8(register))
+					kr.TU = 1
+				}
+			}
 			return data1, &mbserver.Success
 		})
 }
@@ -532,14 +564,17 @@ func WrMultipleRegisterOverr(server *mbserver.Server) {
 		})
 }
 
+//****************************************************************************************
+// функция управления кранами
+
 // ***************************************************************************************
 // з
 func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}, inc <-chan inc_req) {
 	var xx inc_req
-
+	//var timer1 time.Timer
 	//	handler := modbus.NewRTUClientHandler(chanel.Port_tty) // с версии 0.17 пишем порты напямую, можно COM-порты пускать под Wndows
 	handler := modbus.NewTCPClientHandler(chanel.Ip + ":" + strconv.Itoa(chanel.Port)) // с версии 0.17 пишем порты напямую, можно COM-порты пускать под Wndows
-	handler.IdleTimeout = 500                                                          //  тайл-аут на операции
+	handler.IdleTimeout = 10                                                           //  тайл-аут на операции
 	handler.SlaveId = 1
 
 	err := handler.Connect()
@@ -591,7 +626,7 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 					}
 				}
 				// *************************************
-			case 01:
+			case 01: // Для такт у не нужна
 				result1, err2 := client.ReadCoils(uint16(chanel.Set_node[count].Address_data), uint16(chanel.Set_node[count].Data_length))
 				if err2 != nil {
 					// пока нет расширеннной обработки ошибки запроса - просто выход !!!!!
@@ -674,7 +709,11 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 							//server.HoldingRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
 							// Пересчет милиамперов из Такт-У в кода АЦП Зонда 0-4096
 							s := int16(new_data[ii])
-							new_data[ii] = uint16(float32(s) * 0.2048)
+							var d = float32(0)
+							if float32(s) >= float32(4000) {
+								d = float32((float32(s)-4000)/16000) * 4095 // переводим в шкалу 0-4095/4мА - 20 мА
+							}
+							new_data[ii] = uint16(d)
 							server.InputRegisters[ii+int(chanel.Set_node[count].Index_up)] = new_data[ii]
 						}
 						if chanel.Set_node[count].Type_par == 2 { // Разбираем Слово на биты если нам надо прочитать дискретный вход
@@ -692,6 +731,62 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 
 							}
 						}
+					}
+				}
+			case 05: // Write Single Coils
+				if handler.SlaveId != 1 {
+					//						handler.Close()
+					handler.SlaveId = 1
+					//						handler.Connect()
+					//						defer handler.Close()
+					client = modbus.NewClient(handler) // перезапустим клиента
+				}
+				server.Coils[chanel.Set_node[count].Index_up] = server.Coils[chanel.Set_node[count].Index_up]
+				for ii := 0; ii < int(chanel.Set_node[count].Data_length); ii++ {
+					// Если пришла команда закрытия и есть сеанс
+					var Seans_KR_OFF = server.Coils[int(chanel.Set_node[count].Index_up)+ii] == 0 && kr.TU == 1 && !(server.DiscreteInputs[int(chanel.Set_node[count-1].Index_up)+4] == 1) // Если пришла команда закрытия и есть сеанс
+					var Seans_KR_ON = server.Coils[int(chanel.Set_node[count].Index_up)+ii] == 0 && kr.TU == 2 && !(server.DiscreteInputs[int(chanel.Set_node[count-1].Index_up)+5] == 1)  // Если пришла команда открытия и есть сеанс
+					if Seans_KR_OFF {
+						result4, err3 := client.ReadHoldingRegisters(uint16(36), uint16(1)) // Вычитываем что в регистре управления DO
+						err_log(err3, result4)
+						if kr.pred != 2 { // Если отмена
+							result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), binary.LittleEndian.Uint16(result4)|uint16(00000001<<1))
+							err_log(err3, result5)
+						} else {
+							result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), binary.LittleEndian.Uint16(result4)^uint16(00000001<<1))
+							err_log(err3, result5)
+						}
+					} else { // Если пришла команда открытия и есть сеанс
+						if Seans_KR_ON {
+							result4, err3 := client.ReadHoldingRegisters(uint16(36), uint16(1)) // Вычитываем что в регистре управления DO
+							err_log(err3, result4)
+							if kr.pred != 2 { // Если отмена
+								result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint16(result4)|uint16(00000001<<2)))
+								err_log(err3, result5)
+								//if timer1.Stop() {
+								//	timer1 := time.NewTimer(10 * time.Second)
+								//	<-timer1.C
+								//	fmt.Printf("\t>>>>> Отработал таймер 10 сек: %v\r\n", timer1)
+								//}
+
+							} else {
+								result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint16(result4)^uint16(00000001<<2)))
+								err_log(err3, result5)
+							}
+						}
+						// Если сеанс закрыли сбрасываем в 00
+						if !Seans_KR_ON && !Seans_KR_OFF {
+							result4, err3 := client.ReadHoldingRegisters(uint16(36), uint16(1)) // Вычитываем что в регистре управления DO
+							err_log(err3, result4)
+							client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint16(result4)&uint16(00)))
+							kr.TU = 0 //Сброс ТУ
+						}
+					}
+					if err != nil {
+						// ошибка записи Single Copils
+						Log.Printf("**ERROR** Write Single Coils, Chanel: %s AddrID: %d\r\n", chanel.Ip, 1)
+						//Log.Printf("**data Responce: %v", write5)
+						CoilsRed[xx.Pos].Status = 2 // ошибка записи в !!!!!
 					}
 				}
 			default:
@@ -828,22 +923,12 @@ func main() {
 
 	defer serv.Close()
 
-	//serv.SetDataWithRegisterAndNumber()
-	/*
-		handler_local := modbus.NewTCPClientHandler("localhost:" + strconv.Itoa(config.Local_port))
-		// Connect manually so that multiple requests are handled in one session
-		handler_local.Connect()
-		defer handler_local.Close()
-		client_local := modbus.NewClient(handler_local)
-		_, err = client_local.WriteMultipleRegisters(0, 3, []byte{0, 3, 0, 4, 0, 5})
-		if err != nil {
-			log.Printf("%v\n", err)
+	for count := 0; count < int(config.Tcp_serial[0].Count_node); count++ {
+		if config.Tcp_serial[0].Set_node[count].Type_par == 3 {
+			kr.KR_num = 1
+			kr.Address_data = uint16(config.Tcp_serial[0].Set_node[count].Index_up - 5)
 		}
-		//result, err := client_local.ReadHoldingRegisters(0,3)
-		results, err := client_local.ReadHoldingRegisters(0, 3)
-		fmt.Printf("results %v\n", results)
-		//	client_local.WriteMultipleRegisters()
-	*/
+	}
 
 	fmt.Println("awatin signal & MSG")
 
@@ -919,15 +1004,13 @@ func main() {
 				}
 			}
 		}
-		fmt.Println(cc)
 		// вызов циклической горутины запроса, пока одной по конкретному каналу (направлению опроса)
 		go req_tcp_serial(serv, &config.Tcp_serial[i], cc, icc) // запускаем обработчик канала ввода-вывода
 	}
 	for {
-
-		fmt.Println(serv.Coils[0])
-		fmt.Println(serv.HoldingRegisters[0])
-		time.Sleep(1 * time.Second)
+		//	fmt.Println(serv)
+		//fmt.Println(serv.HoldingRegisters[0])
+		time.Sleep(time.Millisecond * 200) // 500 мл Сек опрос
 	}
 	<-c // ожидание нажатия Ctrl+C или kill
 
