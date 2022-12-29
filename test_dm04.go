@@ -66,6 +66,7 @@ type KR_registrs_cils struct {
 	sesion       int            // Открытие ссесии 0-нет 1-открыта
 	pred         int            // предварительная команда 0-нет 1-открыть 2-закрыть
 	TU           int            // команда 0-нет 1-открыть 2-закрыть
+	Timer        bool           // Запуск таймера 0-нет 1-открыть
 	Address_data uint16         // адрес Coils В устройстве начальный
 	icc          chan<- inc_req // канал для передачи данных записи в гороутину
 	Time         time.Time      // время последней записи в Coils
@@ -165,6 +166,15 @@ func err_log(err3 error, result []byte) {
 		Log.Printf("**ERROR** Chanel: %s", result)
 		os.Exit(-1)
 	}
+}
+
+// ***************************************************************************************
+// Открытие закрытие
+func ON_OFF() {
+	timer1 := time.NewTimer(30 * time.Second)
+	<-timer1.C
+	fmt.Printf("\t>>>>> Отработал таймер 30 сек: %v\r\n", timer1)
+	kr.TU = 0
 }
 
 // структура для передачи запроса на исполнение команды с данными в канал с необходимым нам устройством Modbus RTU
@@ -752,25 +762,32 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 						if kr.pred != 2 { // Если отмена
 							result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), binary.LittleEndian.Uint16(result4)|uint16(00000001<<1))
 							err_log(err3, result5)
+							if !kr.Timer {
+								go ON_OFF()
+								kr.Timer = true
+							}
 						} else {
 							result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), binary.LittleEndian.Uint16(result4)^uint16(00000001<<1))
 							err_log(err3, result5)
 						}
 					} else { // Если пришла команда открытия и есть сеанс
 						if Seans_KR_ON {
-							result4, err3 := client.ReadHoldingRegisters(uint16(36), uint16(1)) // Вычитываем что в регистре управления DO
+							result4, err3 := client.ReadHoldingRegisters(uint16(36), uint16(2)) // Вычитываем что в регистре управления DO
 							err_log(err3, result4)
 							if kr.pred != 2 { // Если отмена
-								result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint16(result4)|uint16(00000001<<2)))
+								result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(uint32(binary.LittleEndian.Uint32(result4)|uint32(00000001<<2))))
 								err_log(err3, result5)
-								//if timer1.Stop() {
-								//	timer1 := time.NewTimer(10 * time.Second)
-								//	<-timer1.C
-								//	fmt.Printf("\t>>>>> Отработал таймер 10 сек: %v\r\n", timer1)
+								//if !kr.Timer {
+								//	//go ON_OFF()
+								//	Timer1 := time.NewTimer(30 * time.Second)
+								//	<-Timer1.C
+								//	fmt.Printf("\t>>>>> Отработал таймер 30 сек: %v\r\n", Timer1)
+								//	//kr.TU = 0
+								//	kr.Timer = true
 								//}
 
 							} else {
-								result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint16(result4)^uint16(00000001<<2)))
+								result5, err3 := client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint32(result4)^uint32(00000001<<2)))
 								err_log(err3, result5)
 							}
 						}
@@ -779,7 +796,8 @@ func req_tcp_serial(server *mbserver.Server, chanel *set_tcp, cc <-chan struct{}
 							result4, err3 := client.ReadHoldingRegisters(uint16(36), uint16(1)) // Вычитываем что в регистре управления DO
 							err_log(err3, result4)
 							client.WriteSingleRegister(uint16(chanel.Set_node[count].Address_data), uint16(binary.LittleEndian.Uint16(result4)&uint16(00)))
-							kr.TU = 0 //Сброс ТУ
+							kr.TU = 0        //Сброс ТU
+							kr.Timer = false //Сброс
 						}
 					}
 					if err != nil {
@@ -1010,7 +1028,7 @@ func main() {
 	for {
 		//	fmt.Println(serv)
 		//fmt.Println(serv.HoldingRegisters[0])
-		time.Sleep(time.Millisecond * 200) // 500 мл Сек опрос
+		time.Sleep(time.Millisecond * 200) // 200 мл Сек опрос
 	}
 	<-c // ожидание нажатия Ctrl+C или kill
 
